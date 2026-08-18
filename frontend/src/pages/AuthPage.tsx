@@ -44,7 +44,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
         // Fallback smooth transition
         setAuthData({
           telegramAuthToken: 'offline-token',
-          botLink: 'https://t.me/dokonim_qorgonobod_bot',
+          botLink: 'https://t.me/Raqamli_mahallam_bot',
           debugCode: '777777',
         });
         setStep('code');
@@ -53,7 +53,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
       // If server is warming up, still proceed with fallback code
       setAuthData({
         telegramAuthToken: 'offline-token',
-        botLink: 'https://t.me/dokonim_qorgonobod_bot',
+        botLink: 'https://t.me/Raqamli_mahallam_bot',
         debugCode: '777777',
       });
       setStep('code');

@@ -25,7 +25,7 @@ except ImportError:
 # ==============================================================================
 BOT_TOKEN = "8682502517:AAHMdw97lxztbMfZTWqGJBXL7pNjSsoE0OU"
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
-BOT_USERNAME = "dokonim_qorgonobod_bot"
+BOT_USERNAME = "Raqamli_mahallam_bot"
 STORE_TELEGRAM_ID = "6473433651"
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dokonim.db")
 
