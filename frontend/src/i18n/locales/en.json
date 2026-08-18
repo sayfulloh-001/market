@@ -1,0 +1,111 @@
+{
+  "appName": "Do'konim",
+  "slogan": "Grocery delivery right to your door.",
+  "selectLanguage": "Select Language",
+  "continue": "Continue",
+  "login": {
+    "title": "Sign In",
+    "subtitle": "Enter your phone number and verify via Telegram",
+    "phoneLabel": "Phone Number",
+    "placeholder": "+998 90 123 45 67",
+    "submit": "Verify via Telegram",
+    "telegramStepTitle": "Open Telegram Bot",
+    "telegramStepDesc": "Click the button below and press /start in the bot",
+    "openTelegramBot": "🤖 Open Telegram Bot",
+    "checking": "Waiting for verification...",
+    "success": "Successfully verified!"
+  },
+  "faceUpload": {
+    "title": "Add Face Photo",
+    "subtitle": "Upload a clear facial photo for profile verification",
+    "requirements": "Face must be clearly visible with good illumination",
+    "uploadBtn": "📷 Upload Photo / Take Picture",
+    "confirmBtn": "Confirm & Proceed"
+  },
+  "nav": {
+    "orders": "Orders",
+    "profile": "Profile"
+  },
+  "contacts": {
+    "title": "Mahalla Contacts",
+    "searchPlaceholder": "Search by name, surname or phone...",
+    "empty": "No contacts found yet",
+    "mahallaLabel": "Mahalla"
+  },
+  "orders": {
+    "title": "Store Grocery Delivery",
+    "limitBanner": "Order as many grocery items as you need",
+    "limitExceeded": "Your daily order limit has been reached. Next order available tomorrow after 00:00.",
+    "newOrderBtn": "➕ Place New Order",
+    "step1Location": "1. Send Location",
+    "gpsBtn": "📍 Detect GPS Location",
+    "locationSet": "Location detected",
+    "step2Items": "2. What do you need?",
+    "itemsPlaceholder": "E.g.: Bread, milk, 2kg sugar and vegetable oil...",
+    "submitOrder": "🛒 Submit Order",
+    "myOrders": "Order History",
+    "emptyOrders": "You have no orders yet.",
+    "status": {
+      "PENDING": "Pending",
+      "ACCEPTED": "Accepted",
+      "REJECTED": "Rejected",
+      "DELIVERED": "Delivered (+8 Coins)",
+      "CANCELLED": "Cancelled"
+    }
+  },
+  "applications": {
+    "title": "Contact Chairman",
+    "subtitle": "Send requests, questions or issues directly to the Mahalla Chairman",
+    "newAppBtn": "📝 Create Application",
+    "appTitlePlaceholder": "Application topic (e.g., street lights)",
+    "appMsgPlaceholder": "Describe your request in detail...",
+    "sendApp": "Send",
+    "empty": "You have not submitted any applications yet.",
+    "chatTitle": "Chat with Chairman",
+    "typeMessage": "Type a message...",
+    "send": "Send"
+  },
+  "profile": {
+    "title": "My Profile",
+    "editName": "Edit Name",
+    "phone": "Phone Number",
+    "phoneImmutable": "Phone number can only be changed via verification flow",
+    "coins": "Coin Balance",
+    "dailyBonusBtn": "🎁 Claim Daily +5 Coin Bonus",
+    "dailyClaimed": "Daily +5 Coins claimed",
+    "coinStoreBtn": "🏪 Coin Rewards Store",
+    "language": "Language",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "logout": "Log Out",
+    "logoutModal": {
+      "title": "Are you sure you want to log out?",
+      "confirm": "Log Out",
+      "cancel": "Cancel"
+    }
+  },
+  "coinStore": {
+    "title": "Coin Rewards Store",
+    "balance": "Your available balance",
+    "buyBtn": "Redeem",
+    "confirmModalTitle": "Confirm Redemption",
+    "confirmMsg": "{{price}} coins will be deducted. Proceed?",
+    "successMsg": "Redemption successful!"
+  },
+  "admin": {
+    "title": "Admin Dashboard",
+    "stats": {
+      "users": "Total Users",
+      "ordersToday": "Orders Today",
+      "apps": "Total Applications",
+      "stores": "Active Stores",
+      "coinsEarned": "Total Coins Issued"
+    },
+    "usersTab": "Users",
+    "storesTab": "Stores",
+    "blockBtn": "Block",
+    "unblockBtn": "Unblock"
+  }
+}

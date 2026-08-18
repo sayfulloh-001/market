@@ -1,0 +1,111 @@
+{
+  "appName": "Do'konim",
+  "slogan": "Istalgan mahsulotingizni uyingizgacha yetkazamiz.",
+  "selectLanguage": "Tilni tanlang",
+  "continue": "Davom ettirish",
+  "login": {
+    "title": "Tizimga kirish",
+    "subtitle": "Telefon raqamingizni kiriting va Telegram orqali tasdiqlang",
+    "phoneLabel": "Telefon raqamingiz",
+    "placeholder": "+998 90 123 45 67",
+    "submit": "Telegram orqali tasdiqlash",
+    "telegramStepTitle": "Telegram botga o'ting",
+    "telegramStepDesc": "Pastdagi tugmani bosing va Telegram botda /start ni bosing",
+    "openTelegramBot": "🤖 Telegram Botni Ochish",
+    "checking": "Tasdiqlanish kutilmoqda...",
+    "success": "Muvaffaqiyatli tasdiqlandi!"
+  },
+  "faceUpload": {
+    "title": "Yuz rasmini qo'shing",
+    "subtitle": "Profilingiz uchun yuzingiz aniq ko'rinadigan rasm yuklang",
+    "requirements": "Yuz aniq ko'rinishi, qorong'i bo'lmasligi kerak",
+    "uploadBtn": "📷 Rasm yuklash / Suratga olish",
+    "confirmBtn": "Tasdiqlash va davom etish"
+  },
+  "nav": {
+    "orders": "Buyurtma",
+    "profile": "Profil"
+  },
+  "contacts": {
+    "title": "Mahalla Kontaktlari",
+    "searchPlaceholder": "Ism, familiya yoki telefon qidirish...",
+    "empty": "Hozircha kontaktlar topilmadi",
+    "mahallaLabel": "Mahalla"
+  },
+  "orders": {
+    "title": "Do'kondan Buyurtma Berish",
+    "limitBanner": "Istalgancha mahsulot va buyurtma berishingiz mumkin",
+    "limitExceeded": "Bugungi buyurtma limitingiz ishlatildi. Keyingi buyurtma ertaga 00:00 dan keyin mumkin.",
+    "newOrderBtn": "➕ Yangi Buyurtma Berish",
+    "step1Location": "1. Joylashuvni Yuborish",
+    "gpsBtn": "📍 GPS Joylashuvni Aniqlash",
+    "locationSet": "Joylashuv aniqlandi",
+    "step2Items": "2. Nimalar kerak?",
+    "itemsPlaceholder": "Masalan: Non, sut, 2 kg shakar va o'simlik yog'i kerak...",
+    "submitOrder": "🛒 Buyurtma Berish",
+    "myOrders": "Buyurtmalarim Tarixi",
+    "emptyOrders": "Sizda hali buyurtmalar yo'q.",
+    "status": {
+      "PENDING": "Kutilmoqda",
+      "ACCEPTED": "Qabul qilindi",
+      "REJECTED": "Rad etildi",
+      "DELIVERED": "Yetkazib berildi (+8 Coin)",
+      "CANCELLED": "Bekor qilindi"
+    }
+  },
+  "applications": {
+    "title": "Mahalla Raisiga Murojaat",
+    "subtitle": "Savol, taklif yoki muammolaringizni mahalla raisiga yuboring",
+    "newAppBtn": "📝 Yangi Ariza Yozish",
+    "appTitlePlaceholder": "Ariza mavzusi (masalan: ko'cha chirog'i)",
+    "appMsgPlaceholder": "Murojaat mazmunini batafsil yozing...",
+    "sendApp": "Yuborish",
+    "empty": "Siz hali ariza yubormagansiz.",
+    "chatTitle": "Rais bilan chat",
+    "typeMessage": "Xabaringizni yozing...",
+    "send": "Yuborish"
+  },
+  "profile": {
+    "title": "Mening Profilim",
+    "editName": "Ismni tahrirlash",
+    "phone": "Telefon raqami",
+    "phoneImmutable": "Telefon raqamini faqat verification orqali o'zgartirish mumkin",
+    "coins": "Coin Balansi",
+    "dailyBonusBtn": "🎁 Kunlik +5 Coin Bonusini Olish",
+    "dailyClaimed": "Bugungi +5 Coin olingan",
+    "coinStoreBtn": "🏪 Coin Store / Sovg'alar Do'koni",
+    "language": "Til",
+    "theme": "Mavzu",
+    "light": "Yorug'",
+    "dark": "Qorong'i",
+    "system": "Tizim",
+    "logout": "Chiqish",
+    "logoutModal": {
+      "title": "Hisobingizdan chiqmoqchimisiz?",
+      "confirm": "Chiqish",
+      "cancel": "Bekor qilish"
+    }
+  },
+  "coinStore": {
+    "title": "Coin Do'koni",
+    "balance": "Mavjud balansingiz",
+    "buyBtn": "Sotib olish",
+    "confirmModalTitle": "Xaridni tasdiqlang",
+    "confirmMsg": "Sizdan {{price}} coin yechiladi. Davom etasizmi?",
+    "successMsg": "Xarid muvaffaqiyatli amalga oshirildi!"
+  },
+  "admin": {
+    "title": "Admin Boshqaruv Paneli",
+    "stats": {
+      "users": "Jami Foydalanuvchilar",
+      "ordersToday": "Bugungi Buyurtmalar",
+      "apps": "Jami Arizalar",
+      "stores": "Faol Do'konlar",
+      "coinsEarned": "Berilgan Coinlar"
+    },
+    "usersTab": "Foydalanuvchilar",
+    "storesTab": "Do'konlar",
+    "blockBtn": "Bloklash",
+    "unblockBtn": "Blokdan chiqarish"
+  }
+}

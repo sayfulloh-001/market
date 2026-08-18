@@ -1,0 +1,8 @@
+{
+  "appId": "com.raqamlimahalla.app",
+  "appName": "Raqamli Mahalla",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

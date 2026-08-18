@@ -1,0 +1,212 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String            @id @default(uuid())
+  phone            String            @unique
+  firstName        String
+  lastName         String
+  photoUrl         String?
+  isFaceVerified   Boolean           @default(false)
+  role             String            @default("USER") // USER, STORE, DELIVERY, CHAIRMAN, ADMIN
+  telegramId       String?           @unique
+  telegramUsername String?
+  language         String            @default("uz")
+  mahalla          String            @default("Tinchlik Mahallasi")
+  isBlocked        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  orders           Order[]
+  applications     Application[]
+  coinBalance      CoinBalance?
+  coinTransactions CoinTransaction[]
+  dailyRewards     DailyReward[]
+  redemptions      RewardRedemption[]
+  notifications    Notification[]
+
+  @@map("users")
+}
+
+model AuthVerification {
+  id                String   @id @default(uuid())
+  phone             String   @unique
+  code              String
+  telegramAuthToken String   @unique
+  isVerified        Boolean  @default(false)
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  @@map("auth_verifications")
+}
+
+model Store {
+  id         String   @id @default(uuid())
+  name       String
+  telegramId String   @unique
+  isActive   Boolean  @default(true)
+  orderCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  orders     Order[]
+
+  @@map("stores")
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  userId          String
+  phone           String
+  userName        String
+  text            String
+  locationAddress String?
+  latitude        Float?
+  longitude       Float?
+  status          String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, DELIVERED, CANCELLED
+  assignedStoreId String?
+  coinRewarded    Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deliveredAt     DateTime?
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedStore   Store?   @relation(fields: [assignedStoreId], references: [id], onDelete: SetNull)
+
+  statusHistory   OrderStatusHistory[]
+
+  @@map("orders")
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(uuid())
+  orderId   String
+  status    String
+  note      String?
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_status_histories")
+}
+
+model Application {
+  id        String               @id @default(uuid())
+  userId    String
+  title     String
+  status    String               @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ApplicationMessage[]
+
+  @@map("applications")
+}
+
+model ApplicationMessage {
+  id                String      @id @default(uuid())
+  applicationId     String
+  senderRole        String      // USER, CHAIRMAN
+  senderName        String
+  content           String
+  telegramMessageId String?
+  isRead            Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+
+  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("application_messages")
+}
+
+model CoinBalance {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  balance     Int      @default(0)
+  totalEarned Int      @default(0)
+  totalSpent  Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("coin_balances")
+}
+
+model CoinTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Int      // positive for credit, negative for debit
+  type        String   // DAILY_REWARD, ORDER_REWARD, STORE_PURCHASE, ADMIN_ADJUSTMENT
+  description String
+  referenceId String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("coin_transactions")
+}
+
+model DailyReward {
+  id        String   @id @default(uuid())
+  userId    String
+  dateKey   String   // format "YYYY-MM-DD" in Asia/Tashkent timezone
+  coins     Int      @default(5)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dateKey])
+  @@map("daily_rewards")
+}
+
+model Reward {
+  id            String   @id @default(uuid())
+  nameUz        String
+  nameRu        String
+  nameEn        String
+  descriptionUz String
+  descriptionRu String
+  descriptionEn String
+  coinPrice     Int
+  stock         Int      @default(100)
+  image         String
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  redemptions   RewardRedemption[]
+
+  @@map("rewards")
+}
+
+model RewardRedemption {
+  id        String   @id @default(uuid())
+  userId    String
+  rewardId  String
+  coinCost  Int
+  status    String   @default("FULFILLED") // PENDING, FULFILLED
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward    Reward   @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@map("reward_redemptions")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}

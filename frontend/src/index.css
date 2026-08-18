@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+}
+
+/* Senior-friendly large button utility */
+.btn-large {
+  min-height: 52px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-large:active {
+  transform: scale(0.98);
+}
+
+/* Glassmorphism & Shadow utilities */
+.card-shadow {
+  box-shadow: 0 4px 20px -2px rgba(22, 163, 74, 0.08);
+}
+
+.card-elevated {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+}
