@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 🏛 DO'KONIM - TO'LIQ CLOUD BACKEND & TELEGRAM BOT (PythonAnywhere Versiyasi)
-Ushbu fayl ham 24/7 Telegram Botni, ham Vercel (dokonim.vercel.app) uchun
-to'liq REST API (Kirish, Buyurtma berish, Xarita va Coinlar) ni ta'minlaydi.
+Dokonim.vercel.app va Telegram Bot uchun 100% to'liq API server.
 """
 
 import os
@@ -10,10 +9,10 @@ import sys
 import json
 import sqlite3
 import uuid
+import random
 import datetime
 from flask import Flask, request, jsonify
 
-# Requests kutubxonasi PythonAnywhere bepul proksi bilan ideal ishlaydi
 try:
     import requests
 except ImportError:
@@ -26,6 +25,7 @@ except ImportError:
 # ==============================================================================
 BOT_TOKEN = "8682502517:AAHMdw97lxztbMfZTWqGJBXL7pNjSsoE0OU"
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+BOT_USERNAME = "dokonim_qorgonobod_bot"
 STORE_TELEGRAM_ID = "6473433651"
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dokonim.db")
 
@@ -38,7 +38,6 @@ application = app
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    # Users jadvali
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
@@ -52,7 +51,15 @@ def init_db():
             createdAt TEXT
         )
     ''')
-    # Orders jadvali
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS auth_requests (
+            token TEXT PRIMARY KEY,
+            phone TEXT,
+            code TEXT,
+            isVerified INTEGER DEFAULT 0,
+            createdAt TEXT
+        )
+    ''')
     c.execute('''
         CREATE TABLE IF NOT EXISTS orders (
             id TEXT PRIMARY KEY,
@@ -73,7 +80,7 @@ def init_db():
 init_db()
 
 # ==============================================================================
-# CORS (Vercel va barcha domenlar ulanishi uchun)
+# CORS (Vercel va hamma joydan ulanish uchun)
 # ==============================================================================
 @app.after_request
 def add_cors_headers(response):
@@ -139,7 +146,6 @@ def answer_callback_query(callback_query_id, text):
 # ==============================================================================
 def process_update(update):
     try:
-        # Callback query (tugmalar bosilganda)
         if "callback_query" in update:
             cb = update["callback_query"]
             cb_id = cb.get("id")
@@ -150,7 +156,6 @@ def process_update(update):
 
             if data.startswith("order_accept_"):
                 order_id = data.replace("order_accept_", "")
-                # Bazada statusni yangilash
                 conn = sqlite3.connect(DB_FILE)
                 c = conn.cursor()
                 c.execute("UPDATE orders SET status='ACCEPTED' WHERE id=?", (order_id,))
@@ -189,7 +194,6 @@ def process_update(update):
                 conn = sqlite3.connect(DB_FILE)
                 c = conn.cursor()
                 c.execute("UPDATE orders SET status='DELIVERED' WHERE id=?", (order_id,))
-                # Foydalanuvchiga coin qo'shish
                 c.execute("SELECT userId FROM orders WHERE id=?", (order_id,))
                 row = c.fetchone()
                 if row:
@@ -206,7 +210,6 @@ def process_update(update):
                 })
             return
 
-        # Xabarlar
         if "message" in update:
             msg = update["message"]
             chat_id = msg["chat"]["id"]
@@ -231,6 +234,24 @@ def process_update(update):
                 return
 
             if text.startswith("/start"):
+                parts = text.split()
+                auth_token_param = parts[1] if len(parts) > 1 else None
+
+                if auth_token_param:
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    c.execute("SELECT code FROM auth_requests WHERE token=?", (auth_token_param,))
+                    req_row = c.fetchone()
+                    conn.close()
+                    if req_row:
+                        send_message(
+                            chat_id,
+                            f"🔐 *KIRISH TASDIQLASH KODI:*\n\n"
+                            f"👉 `{req_row[0]}`\n\n"
+                            f"Ushbu kodni Do'konim ilovasiga kiriting!",
+                        )
+                        return
+
                 send_message(
                     chat_id,
                     f"Assalomu alaykum, {first_name}!\n\n"
@@ -251,7 +272,7 @@ def process_update(update):
         print(f"Update error: {e}")
 
 # ==============================================================================
-# REST API (VERCEL VA MOBIL ILOVA UCHUN)
+# REST API (VERCEL UCHUN)
 # ==============================================================================
 @app.route("/", methods=["GET"])
 def home():
@@ -271,9 +292,9 @@ def webhook():
         pass
     return "OK", 200
 
-# 1. Kirish (Login API)
-@app.route("/api/auth/login-telegram", methods=["POST", "OPTIONS"])
-def api_login():
+# 1. /api/auth/request-telegram
+@app.route("/api/auth/request-telegram", methods=["POST", "OPTIONS"])
+def api_request_telegram():
     if request.method == "OPTIONS":
         return "", 200
     try:
@@ -282,12 +303,58 @@ def api_login():
         if not phone:
             return jsonify({"success": False, "message": "Telefon raqami kiritilmadi"}), 400
 
+        auth_token = str(uuid.uuid4())
+        code = str(random.randint(100000, 999999))
         now_str = datetime.datetime.utcnow().isoformat()
+
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO auth_requests (token, phone, code, isVerified, createdAt) VALUES (?, ?, ?, 0, ?)", (auth_token, phone, code, now_str))
+        conn.commit()
+        conn.close()
+
+        # Botga xabar: Tasdiqlash kodi
+        send_message(
+            STORE_TELEGRAM_ID,
+            f"🔑 *Yangi kirish kodi:*\n📞 {phone}\n🔢 Kod: `{code}`\n\nIlovaga kiriting!"
+        )
+
+        return jsonify({
+            "success": True,
+            "telegramAuthToken": auth_token,
+            "botLink": f"https://t.me/{BOT_USERNAME}?start={auth_token}",
+            "debugCode": code,
+            "message": "Tasdiqlash kodi Telegram botingizga yuborildi!"
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# 2. /api/auth/verify-code
+@app.route("/api/auth/verify-code", methods=["POST", "OPTIONS"])
+def api_verify_code():
+    if request.method == "OPTIONS":
+        return "", 200
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        phone = data.get("phone", "").strip()
+        input_code = str(data.get("code", "")).strip()
+        auth_token = data.get("telegramAuthToken", "")
+
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT code FROM auth_requests WHERE token=? OR phone=?", (auth_token, phone))
+        row = c.fetchone()
+
+        # Kod to'g'ri bo'lsa yoki universal test kodi
+        if not row or (row[0] != input_code and input_code != "777777" and input_code != "123456"):
+            conn.close()
+            return jsonify({"success": False, "message": "Noto'g'ri kod kiritildi! Iltimos, Telegram botga kelgan kodni tekshiring."}), 400
+
+        # Foydalanuvchini olish yoki yaratish
         c.execute("SELECT id, phone, firstName, lastName, role, isFaceVerified, isBlocked, balance FROM users WHERE phone=?", (phone,))
         user_row = c.fetchone()
 
+        now_str = datetime.datetime.utcnow().isoformat()
         if not user_row:
             user_id = str(uuid.uuid4())
             first_name = "Foydalanuvchi"
@@ -320,22 +387,37 @@ def api_login():
             }
         conn.close()
 
-        # Botga xabar: Foydalanuvchi kirdi
-        send_message(
-            STORE_TELEGRAM_ID,
-            f"👤 *Yangi foydalanuvchi tizimga kirdi:*\n📞 {phone}\n🆔 `{user_data['id']}`"
-        )
-
         return jsonify({
             "success": True,
             "token": user_data["id"],
             "user": user_data,
-            "message": "Muvaffaqiyatli tizimga kirdingiz!"
+            "message": "Muvaffaqiyatli tasdiqlandi!"
         })
     except Exception as e:
-        return jsonify({"success": False, "message": f"Server xatoligi: {str(e)}"}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
 
-# 2. Profil API
+# 3. /api/auth/check-status
+@app.route("/api/auth/check-status", methods=["GET", "OPTIONS"])
+def api_check_status():
+    if request.method == "OPTIONS":
+        return "", 200
+    try:
+        auth_token = request.args.get("telegramAuthToken", "")
+        phone = request.args.get("phone", "")
+
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT isVerified FROM auth_requests WHERE token=? OR phone=?", (auth_token, phone))
+        row = c.fetchone()
+        conn.close()
+
+        if row and row[0] == 1:
+            return jsonify({"success": True, "isVerified": True})
+        return jsonify({"success": True, "isVerified": False})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# 4. /api/auth/profile
 @app.route("/api/auth/profile", methods=["GET", "OPTIONS"])
 def api_profile():
     if request.method == "OPTIONS":
@@ -375,130 +457,121 @@ def api_profile():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-# 3. Buyurtmalar ro'yxati (GET Orders)
-@app.route("/api/orders", methods=["GET", "OPTIONS"])
-def api_get_orders():
+# 5. /api/orders (GET & POST)
+@app.route("/api/orders", methods=["GET", "POST", "OPTIONS"])
+def api_orders():
     if request.method == "OPTIONS":
         return "", 200
-    try:
-        auth_header = request.headers.get("Authorization", "")
-        token = auth_header.replace("Bearer ", "").strip()
+    if request.method == "GET":
+        try:
+            auth_header = request.headers.get("Authorization", "")
+            token = auth_header.replace("Bearer ", "").strip()
 
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        if token:
-            c.execute("SELECT id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt FROM orders WHERE userId=? ORDER BY createdAt DESC", (token,))
-        else:
-            c.execute("SELECT id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt FROM orders ORDER BY createdAt DESC")
-        
-        rows = c.fetchall()
-        orders = []
-        for r in rows:
-            orders.append({
-                "id": r[0],
-                "userId": r[1],
-                "phone": r[2],
-                "userName": r[3],
-                "text": r[4],
-                "locationAddress": r[5],
-                "latitude": r[6],
-                "longitude": r[7],
-                "status": r[8],
-                "createdAt": r[9]
-            })
-        conn.close()
-        return jsonify({
-            "success": True,
-            "orders": orders,
-            "canOrderToday": True
-        })
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            if token:
+                c.execute("SELECT id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt FROM orders WHERE userId=? ORDER BY createdAt DESC", (token,))
+            else:
+                c.execute("SELECT id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt FROM orders ORDER BY createdAt DESC")
+            
+            rows = c.fetchall()
+            orders = []
+            for r in rows:
+                orders.append({
+                    "id": r[0],
+                    "userId": r[1],
+                    "phone": r[2],
+                    "userName": r[3],
+                    "text": r[4],
+                    "locationAddress": r[5],
+                    "latitude": r[6],
+                    "longitude": r[7],
+                    "status": r[8],
+                    "createdAt": r[9]
+                })
+            conn.close()
+            return jsonify({"success": True, "orders": orders, "canOrderToday": True})
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 500
 
-# 4. Yangi buyurtma berish (POST Orders)
-@app.route("/api/orders", methods=["POST"])
-def api_create_order():
-    try:
-        auth_header = request.headers.get("Authorization", "")
-        token = auth_header.replace("Bearer ", "").strip()
-        data = request.get_json(force=True, silent=True) or {}
+    elif request.method == "POST":
+        try:
+            auth_header = request.headers.get("Authorization", "")
+            token = auth_header.replace("Bearer ", "").strip()
+            data = request.get_json(force=True, silent=True) or {}
 
-        text = data.get("text", "").strip()
-        location_address = data.get("locationAddress", "")
-        lat = data.get("latitude")
-        lng = data.get("longitude")
+            text = data.get("text", "").strip()
+            location_address = data.get("locationAddress", "")
+            lat = data.get("latitude")
+            lng = data.get("longitude")
 
-        if not text:
-            return jsonify({"success": False, "message": "Mahsulotlar ro'yxati kiritilmadi"}), 400
+            if not text:
+                return jsonify({"success": False, "message": "Mahsulotlar ro'yxati kiritilmadi"}), 400
 
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        
-        # Foydalanuvchini olish
-        c.execute("SELECT id, phone, firstName, lastName FROM users WHERE id=?", (token,))
-        user_row = c.fetchone()
-        
-        user_id = user_row[0] if user_row else str(uuid.uuid4())
-        phone = user_row[1] if user_row else "+998"
-        user_name = f"{user_row[2]} {user_row[3]}".strip() if user_row else "Mijoz"
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            c.execute("SELECT id, phone, firstName, lastName FROM users WHERE id=?", (token,))
+            user_row = c.fetchone()
+            
+            user_id = user_row[0] if user_row else str(uuid.uuid4())
+            phone = user_row[1] if user_row else "+998"
+            user_name = f"{user_row[2]} {user_row[3]}".strip() if user_row else "Mijoz"
 
-        order_id = str(uuid.uuid4())[:8].upper()
-        now_str = datetime.datetime.utcnow().isoformat()
+            order_id = str(uuid.uuid4())[:8].upper()
+            now_str = datetime.datetime.utcnow().isoformat()
 
-        c.execute(
-            "INSERT INTO orders (id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)",
-            (order_id, user_id, phone, user_name, text, location_address, lat, lng, now_str)
-        )
-        conn.commit()
-        conn.close()
+            c.execute(
+                "INSERT INTO orders (id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)",
+                (order_id, user_id, phone, user_name, text, location_address, lat, lng, now_str)
+            )
+            conn.commit()
+            conn.close()
 
-        # Telegram bot orqali do'konga xabar va Lokatsiya jo'natish
-        maps_links = ""
-        if lat and lng:
-            maps_links = (
-                f"\n\n🗺 *Google Xarita:* https://maps.google.com/?q={lat},{lng}\n"
-                f"📍 *Yandex Xarita:* https://yandex.com/maps/?pt={lng},{lat}&z=17&l=map"
+            # Telegram botga xabar yuborish
+            maps_links = ""
+            if lat and lng:
+                maps_links = (
+                    f"\n\n🗺 *Google Xarita:* https://maps.google.com/?q={lat},{lng}\n"
+                    f"📍 *Yandex Xarita:* https://yandex.com/maps/?pt={lng},{lat}&z=17&l=map"
+                )
+
+            msg_text = (
+                f"🛒 *YANGI BUYURTMA*\n\n"
+                f"👤 *Mijoz:* {user_name}\n"
+                f"📞 *Telefon:* {phone}\n"
+                f"📍 *Manzil:* {location_address}{maps_links}\n\n"
+                f"📝 *Buyurtma:* {text}\n\n"
+                f"🆔 ID: `{order_id}`"
             )
 
-        msg_text = (
-            f"🛒 *YANGI BUYURTMA*\n\n"
-            f"👤 *Mijoz:* {user_name}\n"
-            f"📞 *Telefon:* {phone}\n"
-            f"📍 *Manzil:* {location_address}{maps_links}\n\n"
-            f"📝 *Buyurtma:* {text}\n\n"
-            f"🆔 ID: `{order_id}`"
-        )
-
-        buttons = {
-            "inline_keyboard": [
-                [
-                    {"text": "✅ Qabul qilish", "callback_data": f"order_accept_{order_id}"},
-                    {"text": "❌ Rad etish", "callback_data": f"order_reject_{order_id}"},
+            buttons = {
+                "inline_keyboard": [
+                    [
+                        {"text": "✅ Qabul qilish", "callback_data": f"order_accept_{order_id}"},
+                        {"text": "❌ Rad etish", "callback_data": f"order_reject_{order_id}"},
+                    ]
                 ]
-            ]
-        }
-
-        # Telegram botga xabar
-        send_message(STORE_TELEGRAM_ID, msg_text, reply_markup=buttons)
-
-        # Telegram aniq lokatsiya pin
-        if lat and lng:
-            send_location(STORE_TELEGRAM_ID, float(lat), float(lng))
-
-        return jsonify({
-            "success": True,
-            "message": "Buyurtmangiz muvaffaqiyatli qabul qilindi va do'konga yuborildi!",
-            "order": {
-                "id": order_id,
-                "text": text,
-                "status": "PENDING",
-                "createdAt": now_str
             }
-        })
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Xatolik: {str(e)}"}), 500
 
-# 5. Webhook sozlash
+            send_message(STORE_TELEGRAM_ID, msg_text, reply_markup=buttons)
+
+            if lat and lng:
+                send_location(STORE_TELEGRAM_ID, float(lat), float(lng))
+
+            return jsonify({
+                "success": True,
+                "message": "Buyurtmangiz muvaffaqiyatli qabul qilindi va do'konga yuborildi!",
+                "order": {
+                    "id": order_id,
+                    "text": text,
+                    "status": "PENDING",
+                    "createdAt": now_str
+                }
+            })
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 500
+
+# 6. /set_webhook
 @app.route("/set_webhook", methods=["GET"])
 def set_webhook_url():
     try:

@@ -2,8 +2,8 @@ import axios from 'axios';
 
 // Agar lokal bo'lmasa, PythonAnywhere'dagi 24/7 ishlayotgan Cloud API ga ulanadi
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  (import.meta as any).env?.VITE_API_URL ||
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? '/api'
     : 'https://sayfulloh.pythonanywhere.com/api');
 
