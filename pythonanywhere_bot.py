@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """
-🏛 DO'KONIM - TELEGRAM BOT (PythonAnywhere Versiyasi)
-Bu fayl PythonAnywhere.com uchun 100% moslashtirilgan.
+🏛 DO'KONIM - TO'LIQ CLOUD BACKEND & TELEGRAM BOT (PythonAnywhere Versiyasi)
+Ushbu fayl ham 24/7 Telegram Botni, ham Vercel (dokonim.vercel.app) uchun
+to'liq REST API (Kirish, Buyurtma berish, Xarita va Coinlar) ni ta'minlaydi.
 """
 
 import os
 import sys
 import json
+import sqlite3
+import uuid
+import datetime
 from flask import Flask, request, jsonify
 
 # Requests kutubxonasi PythonAnywhere bepul proksi bilan ideal ishlaydi
@@ -23,15 +27,65 @@ except ImportError:
 BOT_TOKEN = "8682502517:AAHMdw97lxztbMfZTWqGJBXL7pNjSsoE0OU"
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 STORE_TELEGRAM_ID = "6473433651"
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dokonim.db")
 
 app = Flask(__name__)
-application = app  # PythonAnywhere WSGI standarti
+application = app
+
+# ==============================================================================
+# BAZA (SQLITE) INIT
+# ==============================================================================
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    # Users jadvali
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            phone TEXT UNIQUE,
+            firstName TEXT,
+            lastName TEXT,
+            role TEXT DEFAULT 'USER',
+            isFaceVerified INTEGER DEFAULT 1,
+            isBlocked INTEGER DEFAULT 0,
+            balance INTEGER DEFAULT 10,
+            createdAt TEXT
+        )
+    ''')
+    # Orders jadvali
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS orders (
+            id TEXT PRIMARY KEY,
+            userId TEXT,
+            phone TEXT,
+            userName TEXT,
+            text TEXT,
+            locationAddress TEXT,
+            latitude REAL,
+            longitude REAL,
+            status TEXT DEFAULT 'PENDING',
+            createdAt TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# ==============================================================================
+# CORS (Vercel va barcha domenlar ulanishi uchun)
+# ==============================================================================
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return response
 
 # ==============================================================================
 # TELEGRAM API YORDAMCHI FUNKSIYALARI
 # ==============================================================================
 def send_telegram_request(method, data=None):
-    """Telegram API ga so'rov yuborish (Requests yoki Urllib orqali)"""
     url = f"{API_URL}/{method}"
     try:
         if requests is not None:
@@ -51,7 +105,6 @@ def send_telegram_request(method, data=None):
             with urllib.request.urlopen(req, timeout=15) as response:
                 return json.loads(response.read().decode("utf-8"))
     except Exception as e:
-        print(f"⚠️ Telegram API xatolik ({method}): {e}")
         return {"ok": False, "error": str(e)}
 
 def send_message(chat_id, text, reply_markup=None, parse_mode="Markdown"):
@@ -65,7 +118,6 @@ def send_message(chat_id, text, reply_markup=None, parse_mode="Markdown"):
     return send_telegram_request("sendMessage", payload)
 
 def send_location(chat_id, latitude, longitude):
-    """Aniq Telegram Geolocation pin yuborish"""
     try:
         payload = {
             "chat_id": chat_id,
@@ -74,7 +126,6 @@ def send_location(chat_id, latitude, longitude):
         }
         return send_telegram_request("sendLocation", payload)
     except Exception as e:
-        print(f"Location error: {e}")
         return None
 
 def answer_callback_query(callback_query_id, text):
@@ -87,9 +138,8 @@ def answer_callback_query(callback_query_id, text):
 # TELEGRAM UPDATE HANDLER
 # ==============================================================================
 def process_update(update):
-    """Telegramdan kelgan xabarlar va callback querylarni qayta ishlash"""
     try:
-        # 1. Callback Query (Tugmalar bosilganda)
+        # Callback query (tugmalar bosilganda)
         if "callback_query" in update:
             cb = update["callback_query"]
             cb_id = cb.get("id")
@@ -100,6 +150,13 @@ def process_update(update):
 
             if data.startswith("order_accept_"):
                 order_id = data.replace("order_accept_", "")
+                # Bazada statusni yangilash
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                c.execute("UPDATE orders SET status='ACCEPTED' WHERE id=?", (order_id,))
+                conn.commit()
+                conn.close()
+
                 answer_callback_query(cb_id, "Buyurtma qabul qilindi! ✅")
                 send_telegram_request("editMessageReplyMarkup", {
                     "chat_id": chat_id,
@@ -112,15 +169,34 @@ def process_update(update):
                 })
 
             elif data.startswith("order_reject_"):
+                order_id = data.replace("order_reject_", "")
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                c.execute("UPDATE orders SET status='REJECTED' WHERE id=?", (order_id,))
+                conn.commit()
+                conn.close()
+
                 answer_callback_query(cb_id, "Buyurtma rad etildi ❌")
                 send_telegram_request("editMessageText", {
                     "chat_id": chat_id,
                     "message_id": msg_id,
-                    "text": "❌ *BUYURTMA RAD ETILDI*",
+                    "text": f"❌ *BUYURTMA RAD ETILDI*\n\nID: `{order_id}`",
                     "parse_mode": "Markdown"
                 })
 
             elif data.startswith("order_deliver_"):
+                order_id = data.replace("order_deliver_", "")
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                c.execute("UPDATE orders SET status='DELIVERED' WHERE id=?", (order_id,))
+                # Foydalanuvchiga coin qo'shish
+                c.execute("SELECT userId FROM orders WHERE id=?", (order_id,))
+                row = c.fetchone()
+                if row:
+                    c.execute("UPDATE users SET balance = balance + 8 WHERE id=?", (row[0],))
+                conn.commit()
+                conn.close()
+
                 answer_callback_query(cb_id, "Yetkazib berildi deb belgilandi! 🎉")
                 send_telegram_request("editMessageText", {
                     "chat_id": chat_id,
@@ -130,7 +206,7 @@ def process_update(update):
                 })
             return
 
-        # 2. Xabarlar (Messages)
+        # Xabarlar
         if "message" in update:
             msg = update["message"]
             chat_id = msg["chat"]["id"]
@@ -139,7 +215,6 @@ def process_update(update):
             text = msg.get("text", "")
             contact = msg.get("contact")
 
-            # Kontakt yuborilganda
             if contact:
                 phone = contact.get("phone_number", "")
                 if not phone.startswith("+"):
@@ -150,12 +225,11 @@ def process_update(update):
                     f"✅ *Telefon raqamingiz muvaffaqiyatli tasdiqlandi!*\n\n"
                     f"📞 {phone}\n"
                     f"👤 {first_name}\n\n"
-                    f"Endi Do'konim ilovasiga qaytib bemalol foydalanishingiz mumkin.",
+                    f"Endi Do'konim ilovasiga (dokonim.vercel.app) qaytib bemalol foydalanishingiz mumkin.",
                     reply_markup={"remove_keyboard": True}
                 )
                 return
 
-            # /start komandasi
             if text.startswith("/start"):
                 send_message(
                     chat_id,
@@ -174,44 +248,211 @@ def process_update(update):
                 return
 
     except Exception as e:
-        print(f"Update qayta ishlashda xatolik: {e}")
+        print(f"Update error: {e}")
 
 # ==============================================================================
-# FLASK WEBHOOK YO'NALISHLARI
+# REST API (VERCEL VA MOBIL ILOVA UCHUN)
 # ==============================================================================
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({
         "status": "active",
-        "service": "Do'konim Telegram Bot (PythonAnywhere)",
-        "message": "Bot 24/7 ish holatida faol!"
+        "service": "Do'konim Full-Stack Cloud Server",
+        "message": "API va Telegram Bot 24/7 faol ishlamoqda!"
     })
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    """Telegramdan keladigan barcha xabarlar shu yerga tushadi"""
     try:
         update = request.get_json(force=True, silent=True)
         if update:
             process_update(update)
     except Exception as e:
-        print(f"Webhook error: {e}")
+        pass
     return "OK", 200
 
-@app.route("/api/send-order", methods=["POST"])
-def api_send_order():
-    """Backenddan yangi buyurtma kelganda do'konga xabar va lokatsiya yuborish"""
+# 1. Kirish (Login API)
+@app.route("/api/auth/login-telegram", methods=["POST", "OPTIONS"])
+def api_login():
+    if request.method == "OPTIONS":
+        return "", 200
     try:
         data = request.get_json(force=True, silent=True) or {}
-        recipient_id = data.get("storeTelegramId") or STORE_TELEGRAM_ID
-        order_id = data.get("id", "Noma'lum")
-        user_name = data.get("userName", "Mijoz")
-        phone = data.get("phone", "-")
-        items_text = data.get("text", "")
+        phone = data.get("phone", "").strip()
+        if not phone:
+            return jsonify({"success": False, "message": "Telefon raqami kiritilmadi"}), 400
+
+        now_str = datetime.datetime.utcnow().isoformat()
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT id, phone, firstName, lastName, role, isFaceVerified, isBlocked, balance FROM users WHERE phone=?", (phone,))
+        user_row = c.fetchone()
+
+        if not user_row:
+            user_id = str(uuid.uuid4())
+            first_name = "Foydalanuvchi"
+            last_name = phone[-4:]
+            c.execute(
+                "INSERT INTO users (id, phone, firstName, lastName, role, isFaceVerified, isBlocked, balance, createdAt) VALUES (?, ?, ?, ?, 'USER', 1, 0, 10, ?)",
+                (user_id, phone, first_name, last_name, now_str)
+            )
+            conn.commit()
+            user_data = {
+                "id": user_id,
+                "phone": phone,
+                "firstName": first_name,
+                "lastName": last_name,
+                "role": "USER",
+                "isFaceVerified": True,
+                "isBlocked": False,
+                "coinBalance": {"balance": 10}
+            }
+        else:
+            user_data = {
+                "id": user_row[0],
+                "phone": user_row[1],
+                "firstName": user_row[2],
+                "lastName": user_row[3],
+                "role": user_row[4],
+                "isFaceVerified": bool(user_row[5]),
+                "isBlocked": bool(user_row[6]),
+                "coinBalance": {"balance": user_row[7]}
+            }
+        conn.close()
+
+        # Botga xabar: Foydalanuvchi kirdi
+        send_message(
+            STORE_TELEGRAM_ID,
+            f"👤 *Yangi foydalanuvchi tizimga kirdi:*\n📞 {phone}\n🆔 `{user_data['id']}`"
+        )
+
+        return jsonify({
+            "success": True,
+            "token": user_data["id"],
+            "user": user_data,
+            "message": "Muvaffaqiyatli tizimga kirdingiz!"
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Server xatoligi: {str(e)}"}), 500
+
+# 2. Profil API
+@app.route("/api/auth/profile", methods=["GET", "OPTIONS"])
+def api_profile():
+    if request.method == "OPTIONS":
+        return "", 200
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.replace("Bearer ", "").strip()
+        
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        if token:
+            c.execute("SELECT id, phone, firstName, lastName, role, isFaceVerified, isBlocked, balance FROM users WHERE id=?", (token,))
+            user_row = c.fetchone()
+        else:
+            user_row = None
+
+        if not user_row:
+            c.execute("SELECT id, phone, firstName, lastName, role, isFaceVerified, isBlocked, balance FROM users LIMIT 1")
+            user_row = c.fetchone()
+
+        if user_row:
+            user_data = {
+                "id": user_row[0],
+                "phone": user_row[1],
+                "firstName": user_row[2],
+                "lastName": user_row[3],
+                "role": user_row[4],
+                "isFaceVerified": bool(user_row[5]),
+                "isBlocked": bool(user_row[6]),
+                "coinBalance": {"balance": user_row[7]}
+            }
+            conn.close()
+            return jsonify({"success": True, "user": user_data})
+        
+        conn.close()
+        return jsonify({"success": False, "message": "Foydalanuvchi topilmadi"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# 3. Buyurtmalar ro'yxati (GET Orders)
+@app.route("/api/orders", methods=["GET", "OPTIONS"])
+def api_get_orders():
+    if request.method == "OPTIONS":
+        return "", 200
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.replace("Bearer ", "").strip()
+
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        if token:
+            c.execute("SELECT id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt FROM orders WHERE userId=? ORDER BY createdAt DESC", (token,))
+        else:
+            c.execute("SELECT id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt FROM orders ORDER BY createdAt DESC")
+        
+        rows = c.fetchall()
+        orders = []
+        for r in rows:
+            orders.append({
+                "id": r[0],
+                "userId": r[1],
+                "phone": r[2],
+                "userName": r[3],
+                "text": r[4],
+                "locationAddress": r[5],
+                "latitude": r[6],
+                "longitude": r[7],
+                "status": r[8],
+                "createdAt": r[9]
+            })
+        conn.close()
+        return jsonify({
+            "success": True,
+            "orders": orders,
+            "canOrderToday": True
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# 4. Yangi buyurtma berish (POST Orders)
+@app.route("/api/orders", methods=["POST"])
+def api_create_order():
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.replace("Bearer ", "").strip()
+        data = request.get_json(force=True, silent=True) or {}
+
+        text = data.get("text", "").strip()
         location_address = data.get("locationAddress", "")
         lat = data.get("latitude")
         lng = data.get("longitude")
 
+        if not text:
+            return jsonify({"success": False, "message": "Mahsulotlar ro'yxati kiritilmadi"}), 400
+
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        
+        # Foydalanuvchini olish
+        c.execute("SELECT id, phone, firstName, lastName FROM users WHERE id=?", (token,))
+        user_row = c.fetchone()
+        
+        user_id = user_row[0] if user_row else str(uuid.uuid4())
+        phone = user_row[1] if user_row else "+998"
+        user_name = f"{user_row[2]} {user_row[3]}".strip() if user_row else "Mijoz"
+
+        order_id = str(uuid.uuid4())[:8].upper()
+        now_str = datetime.datetime.utcnow().isoformat()
+
+        c.execute(
+            "INSERT INTO orders (id, userId, phone, userName, text, locationAddress, latitude, longitude, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)",
+            (order_id, user_id, phone, user_name, text, location_address, lat, lng, now_str)
+        )
+        conn.commit()
+        conn.close()
+
+        # Telegram bot orqali do'konga xabar va Lokatsiya jo'natish
         maps_links = ""
         if lat and lng:
             maps_links = (
@@ -223,8 +464,8 @@ def api_send_order():
             f"🛒 *YANGI BUYURTMA*\n\n"
             f"👤 *Mijoz:* {user_name}\n"
             f"📞 *Telefon:* {phone}\n"
-            f"📍 *Manzil / Lokatsiya:* {location_address}{maps_links}\n\n"
-            f"📝 *Buyurtma ro'yxati:*\n{items_text}\n\n"
+            f"📍 *Manzil:* {location_address}{maps_links}\n\n"
+            f"📝 *Buyurtma:* {text}\n\n"
             f"🆔 ID: `{order_id}`"
         )
 
@@ -237,20 +478,29 @@ def api_send_order():
             ]
         }
 
-        # 1. Xabar yuborish
-        send_message(recipient_id, msg_text, reply_markup=buttons)
+        # Telegram botga xabar
+        send_message(STORE_TELEGRAM_ID, msg_text, reply_markup=buttons)
 
-        # 2. Aniq Telegram Lokatsiya Pin'ini yuborish
+        # Telegram aniq lokatsiya pin
         if lat and lng:
-            send_location(recipient_id, float(lat), float(lng))
+            send_location(STORE_TELEGRAM_ID, float(lat), float(lng))
 
-        return jsonify({"success": True, "message": "Buyurtma botga muvaffaqiyatli yuborildi!"})
+        return jsonify({
+            "success": True,
+            "message": "Buyurtmangiz muvaffaqiyatli qabul qilindi va do'konga yuborildi!",
+            "order": {
+                "id": order_id,
+                "text": text,
+                "status": "PENDING",
+                "createdAt": now_str
+            }
+        })
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "message": f"Xatolik: {str(e)}"}), 500
 
+# 5. Webhook sozlash
 @app.route("/set_webhook", methods=["GET"])
 def set_webhook_url():
-    """Webhook manzilini Telegram API ga ulash"""
     try:
         webhook_url = "https://sayfulloh.pythonanywhere.com/webhook"
         res = send_telegram_request("setWebhook", {"url": webhook_url})
